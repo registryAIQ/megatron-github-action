@@ -32,7 +32,7 @@
 
 ## Quick start
 
-1. Obtain a Megatron API key from registryAIQ.
+1. Obtain a Megatron API key from https://megatron.registryaiq.com/ .
 2. Add it to the repository as `MEGATRON_API_KEY` under **Settings → Secrets and variables → Actions**.
 3. Add `.github/workflows/megatron.yml`:
 
