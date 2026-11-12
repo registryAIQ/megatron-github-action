@@ -1,0 +1,40 @@
+
+name: Megatron Security Scan
+
+on:
+  push:
+    branches: [main, develop]
+
+  pull_request:
+    branches: [main]
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  megatron-scan:
+    name: Megatron Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Run Megatron Security Scanner
+        id: megatron
+        uses: registryaiq/megatron-github-action@v1
+        with:
+          api-key: ${{ secrets.MEGATRON_API_KEY }}
+          fail-on-severity: high
+          scan-path: .
+          upload-sarif: "true"
+
+      - name: Upload Results to GitHub Security
+        if: always() && hashFiles('megatron-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: megatron-results.sarif
+          category: megatron-security
