@@ -1,7 +1,5 @@
-
 name: Megatron Security Scanner
-description: Scan source code for vulnerabilities using Megatron by registryAIQ
-
+description: Scan a repository with the Megatron security engine and publish SARIF findings.
 author: registryAIQ
 
 branding:
@@ -10,29 +8,52 @@ branding:
 
 inputs:
   api-key:
-    description: Megatron API key
+    description: Megatron API key. Store this in a GitHub Actions secret.
     required: true
-
-  fail-on-severity:
-    description: Minimum severity that fails the build
-    required: false
-    default: high
-
   scan-path:
-    description: Directory to scan
+    description: Repository-relative directory or file to scan.
     required: false
     default: .
-
+  fail-on-severity:
+    description: Minimum severity that fails the job (critical, high, medium, low, none).
+    required: false
+    default: high
+  sarif-file:
+    description: Repository-relative path for the generated SARIF report.
+    required: false
+    default: megatron-results.sarif
+  scanner-command:
+    description: Megatron CLI executable available in the container.
+    required: false
+    default: megatron
+  scanner-extra-args:
+    description: >-
+      Optional extra CLI arguments as a JSON string array. Do not put secrets
+      here. Example: ["--profile","ci"].
+    required: false
+    default: "[]"
   upload-sarif:
-    description: Generate SARIF security results
+    description: Upload SARIF to GitHub code scanning (requires caller permissions and entitlement).
     required: false
     default: "true"
+  skip-without-api-key:
+    description: Exit successfully without scanning when the API key is unavailable.
+    required: false
+    default: "false"
+
+outputs:
+  sarif-file:
+    description: Absolute path to the SARIF report, when generated.
 
 runs:
   using: docker
   image: Dockerfile
   env:
     MEGATRON_API_KEY: ${{ inputs.api-key }}
-    FAIL_ON_SEVERITY: ${{ inputs.fail-on-severity }}
-    SCAN_PATH: ${{ inputs.scan-path }}
-    UPLOAD_SARIF: ${{ inputs.upload-sarif }}
+    MEGATRON_SCAN_PATH: ${{ inputs.scan-path }}
+    MEGATRON_FAIL_ON_SEVERITY: ${{ inputs.fail-on-severity }}
+    MEGATRON_SARIF_FILE: ${{ inputs.sarif-file }}
+    MEGATRON_SCANNER_COMMAND: ${{ inputs.scanner-command }}
+    MEGATRON_SCANNER_EXTRA_ARGS: ${{ inputs.scanner-extra-args }}
+    MEGATRON_UPLOAD_SARIF: ${{ inputs.upload-sarif }}
+    MEGATRON_SKIP_WITHOUT_API_KEY: ${{ inputs.skip-without-api-key }}
