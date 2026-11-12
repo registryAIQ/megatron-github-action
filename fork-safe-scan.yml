@@ -1,0 +1,32 @@
+name: Megatron Fork-Safe Scan
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan:
+    # For fork-originated pull_request events, secrets are unavailable.
+    # Skip rather than elevating privileges or switching to pull_request_target.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Megatron scan
+        uses: registryaiq/megatron-github-action@v1
+        with:
+          api-key: ${{ secrets.MEGATRON_API_KEY }}
+          scan-path: .
+          fail-on-severity: high
+      - name: Upload SARIF
+        if: always() && hashFiles('megatron-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: megatron-results.sarif
+          category: megatron
