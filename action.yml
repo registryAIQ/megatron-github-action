@@ -1,0 +1,38 @@
+
+name: Megatron Security Scanner
+description: Scan source code for vulnerabilities using Megatron by registryAIQ
+
+author: registryAIQ
+
+branding:
+  icon: shield
+  color: orange
+
+inputs:
+  api-key:
+    description: Megatron API key
+    required: true
+
+  fail-on-severity:
+    description: Minimum severity that fails the build
+    required: false
+    default: high
+
+  scan-path:
+    description: Directory to scan
+    required: false
+    default: .
+
+  upload-sarif:
+    description: Generate SARIF security results
+    required: false
+    default: "true"
+
+runs:
+  using: docker
+  image: Dockerfile
+  env:
+    MEGATRON_API_KEY: ${{ inputs.api-key }}
+    FAIL_ON_SEVERITY: ${{ inputs.fail-on-severity }}
+    SCAN_PATH: ${{ inputs.scan-path }}
+    UPLOAD_SARIF: ${{ inputs.upload-sarif }}
