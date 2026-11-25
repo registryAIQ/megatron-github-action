@@ -1,6 +1,7 @@
 # Runs the action from this checkout on every runner type, without a token (OSV on the runner).
 # Set the repository variable MEGATRON_E2E=true and the secret MEGATRON_TOKEN to also scan in
-# Megatron on pushes to main.
+# Megatron on pushes to main and on pull requests from branches of this repository (pull requests
+# from forks get no secrets, so they skip it).
 name: Test
 on:
   push:
@@ -72,7 +73,9 @@ jobs:
         run: '[ "$OUTCOME" = failure ] && [ "$FAILING" -gt 0 ]'
 
   megatron:
-    if: ${{ vars.MEGATRON_E2E == 'true' && github.event_name == 'push' }}
+    if: >-
+      ${{ vars.MEGATRON_E2E == 'true' && (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
