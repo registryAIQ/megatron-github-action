@@ -41,11 +41,13 @@ if [ -z "$expected" ]; then
   exit 2
 fi
 
+# Read the file on stdin: given a Windows path (with backslashes), GNU sha256sum escapes the line
+# and prefixes the hash with "\", so it would never match.
 sha256() {
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | awk '{ print $1 }'
+    sha256sum < "$1" | awk '{ print $1 }'
   else
-    shasum -a 256 "$1" | awk '{ print $1 }'
+    shasum -a 256 < "$1" | awk '{ print $1 }'
   fi
 }
 
