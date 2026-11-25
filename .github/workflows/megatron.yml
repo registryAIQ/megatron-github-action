@@ -1,0 +1,23 @@
+# What a customer adds to their repository to scan every pull request with Megatron.
+# Customers use `registryaiq/megatron-github-action@v1`; this repository runs its own copy (`./`).
+name: Megatron
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write # upload the SARIF report to GitHub code scanning
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./
+        with:
+          token: ${{ secrets.MEGATRON_TOKEN }}
+          project: Megatron Action demo
+          path: demo-app
+          fail-on: high
