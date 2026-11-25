@@ -1,0 +1,96 @@
+# Runs the action from this checkout on every runner type, without a token (OSV on the runner).
+# Set the repository variable MEGATRON_E2E=true and the secret MEGATRON_TOKEN to also scan in
+# Megatron on pushes to main and on pull requests from branches of this repository (pull requests
+# from forks get no secrets, so they skip it).
+name: Test
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: shellcheck scripts/*.sh
+
+  runners:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - id: pass
+        uses: ./
+        with:
+          path: test/fixture
+          fail-on: none
+          upload-sarif: false
+          include-internal-packages: no
+          internal-packages: "@acme/*"
+          sbom-file: sbom.cdx.json
+
+      - name: Check outputs
+        shell: bash
+        env:
+          PACKAGES: ${{ steps.pass.outputs.packages }}
+          VULNS: ${{ steps.pass.outputs.vulnerabilities }}
+          FAILING: ${{ steps.pass.outputs.failing }}
+          UPLOADED: ${{ steps.pass.outputs.uploaded }}
+          SARIF: ${{ steps.pass.outputs.sarif-file }}
+        run: |
+          set -x
+          [ "$PACKAGES" = 2 ]          # lodash and the fixture itself; @acme/internal-ui was left out
+          [ "$VULNS" -gt 0 ]
+          [ "$FAILING" = 0 ]
+          [ "$UPLOADED" = false ]
+          grep -q '"version": "2.1.0"' "$SARIF"
+          grep -q lodash sbom.cdx.json
+          grep -q test/fixture/package-lock.json "$SARIF"
+          ! grep -q internal-ui sbom.cdx.json
+
+      - id: gate
+        continue-on-error: true
+        uses: ./
+        with:
+          path: test/fixture
+          fail-on: high
+          upload-sarif: false
+
+      - name: The high-severity gate must fail
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.gate.outcome }}
+          FAILING: ${{ steps.gate.outputs.failing }}
+        run: '[ "$OUTCOME" = failure ] && [ "$FAILING" -gt 0 ]'
+
+  megatron:
+    if: >-
+      ${{ vars.MEGATRON_E2E == 'true' && (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: scan
+        uses: ./
+        with:
+          token: ${{ secrets.MEGATRON_TOKEN }}
+          project: megatron-github-action tests
+          path: test/fixture
+          fail-on: none
+      - shell: bash
+        env:
+          UPLOADED: ${{ steps.scan.outputs.uploaded }}
+          SCAN_URL: ${{ steps.scan.outputs.scan-url }}
+        run: '[ "$UPLOADED" = true ] && [ -n "$SCAN_URL" ]'

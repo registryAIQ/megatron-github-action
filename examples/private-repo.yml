@@ -1,0 +1,21 @@
+# A private repository without GitHub Code Security: no SARIF upload. Failing findings still show
+# as notes on the lockfile and in the job summary, and the full report is in Megatron.
+name: Megatron
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: registryaiq/megatron-github-action@v1
+        with:
+          token: ${{ secrets.MEGATRON_TOKEN }}
+          upload-sarif: false
+          fail-on: critical

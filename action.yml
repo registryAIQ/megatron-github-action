@@ -1,59 +1,160 @@
-name: Megatron Security Scanner
-description: Scan a repository with the Megatron security engine and publish SARIF findings.
-author: registryAIQ
-
+name: Megatron Vulnerability Scan
+description: Build a CycloneDX SBOM of your dependencies, scan it in Megatron and report vulnerabilities as SARIF in GitHub code scanning.
+author: RegistryAIQ
 branding:
   icon: shield
-  color: orange
+  color: blue
 
 inputs:
-  api-key:
-    description: Megatron API key. Store this in a GitHub Actions secret.
-    required: true
-  scan-path:
-    description: Repository-relative directory or file to scan.
+  token:
+    description: >-
+      Megatron API token (riqpat_...), from a GitHub secret. When it's empty (for example on pull
+      requests from forks, which get no secrets) the SBOM is checked on the runner against the
+      public OSV database instead, and nothing is sent to Megatron.
     required: false
-    default: .
-  fail-on-severity:
-    description: Minimum severity that fails the job (critical, high, medium, low, none).
+    default: ""
+  server:
+    description: Megatron's address.
+    required: false
+    default: https://megatron.registryaiq.com
+  project:
+    description: Megatron project to scan into. Created if it doesn't exist. Default is the repository name.
+    required: false
+    default: ""
+  sbom-name:
+    description: Name of the SBOM in the project (one per name; each run updates it). Default is owner/repo.
+    required: false
+    default: ""
+  report-format:
+    description: "sarif (SARIF 2.1.0, the default) or none."
+    required: false
+    default: sarif
+  sarif-file:
+    description: Where the SARIF report is written.
+    required: false
+    default: megatron.sarif
+  upload-sarif:
+    description: >-
+      Send the SARIF report to GitHub code scanning: auto (the default: yes, except on pull
+      requests from forks), true or false. Needs the security-events write permission, and on
+      private repositories GitHub Code Security.
+    required: false
+    default: auto
+  include-internal-packages:
+    description: >-
+      yes (the default) or no. With no, your own packages (internal-packages patterns, plus local
+      and workspace dependencies) are left out of the SBOM before it's scanned or uploaded.
+    required: false
+    default: "yes"
+  internal-packages:
+    description: "Names of your own packages, one per line or comma-separated, * as wildcard. Example: @acme/*, com.acme.*"
+    required: false
+    default: ""
+  fail-on:
+    description: Fail the job when a vulnerability is at or above this severity, unless it's ignored. critical, high, medium, low, any or none.
     required: false
     default: high
-  sarif-file:
-    description: Repository-relative path for the generated SARIF report.
+  path:
+    description: Folder to scan, relative to the workspace.
     required: false
-    default: megatron-results.sarif
-  scanner-command:
-    description: Megatron CLI executable available in the container.
+    default: .
+  exclude:
+    description: "Paths to skip, one per line, relative to path. Example: testdata/**"
     required: false
-    default: megatron
-  scanner-extra-args:
+    default: ""
+  sbom-file:
+    description: Also write the CycloneDX SBOM to this file (for example to keep it as a build artifact).
+    required: false
+    default: ""
+  ignore-file:
+    description: File of advisory IDs to ignore, one per line followed by a reason.
+    required: false
+    default: .registryaiq-ignore
+  wait:
+    description: How long to wait for Megatron's scan, as a Go duration (10m, 90s).
+    required: false
+    default: 10m
+  scanner-version:
+    description: riq-scan version to run. Only versions with a checksum file in this action can be used.
+    required: false
+    default: 1.0.0
+  download-url:
     description: >-
-      Optional extra CLI arguments as a JSON string array. Do not put secrets
-      here. Example: ["--profile","ci"].
+      Where riq-scan is downloaded from. Only change it for a mirror on runners without internet
+      access; downloads are still checked against this action's checksums.
     required: false
-    default: "[]"
-  upload-sarif:
-    description: Upload SARIF to GitHub code scanning (requires caller permissions and entitlement).
-    required: false
-    default: "true"
-  skip-without-api-key:
-    description: Exit successfully without scanning when the API key is unavailable.
-    required: false
-    default: "false"
+    default: https://github.com/registryaiq/megatron-github-action/releases/download
 
 outputs:
   sarif-file:
-    description: Absolute path to the SARIF report, when generated.
+    description: Path of the SARIF report (empty with report-format none).
+    value: ${{ steps.scan.outputs.sarif-file }}
+  scan-url:
+    description: The scan in Megatron (empty when nothing was uploaded).
+    value: ${{ steps.scan.outputs.scan-url }}
+  packages:
+    description: Number of packages in the SBOM.
+    value: ${{ steps.scan.outputs.packages }}
+  vulnerabilities:
+    description: Number of vulnerabilities found, including ignored ones.
+    value: ${{ steps.scan.outputs.vulnerabilities }}
+  failing:
+    description: Number of vulnerabilities at or above fail-on that aren't ignored.
+    value: ${{ steps.scan.outputs.failing }}
+  uploaded:
+    description: true when the SBOM was scanned in Megatron, false when it was checked on the runner.
+    value: ${{ steps.scan.outputs.uploaded }}
 
 runs:
-  using: docker
-  image: Dockerfile
-  env:
-    MEGATRON_API_KEY: ${{ inputs.api-key }}
-    MEGATRON_SCAN_PATH: ${{ inputs.scan-path }}
-    MEGATRON_FAIL_ON_SEVERITY: ${{ inputs.fail-on-severity }}
-    MEGATRON_SARIF_FILE: ${{ inputs.sarif-file }}
-    MEGATRON_SCANNER_COMMAND: ${{ inputs.scanner-command }}
-    MEGATRON_SCANNER_EXTRA_ARGS: ${{ inputs.scanner-extra-args }}
-    MEGATRON_UPLOAD_SARIF: ${{ inputs.upload-sarif }}
-    MEGATRON_SKIP_WITHOUT_API_KEY: ${{ inputs.skip-without-api-key }}
+  using: composite
+  steps:
+    # Inputs reach the scripts as environment variables, never pasted into the script text, so a
+    # value can't inject shell commands.
+    - name: Install riq-scan
+      id: install
+      shell: bash
+      env:
+        RIQ_VERSION: ${{ inputs.scanner-version }}
+        RIQ_DOWNLOAD_URL: ${{ inputs.download-url }}
+        RIQ_RUNNER_OS: ${{ runner.os }}
+        RIQ_RUNNER_ARCH: ${{ runner.arch }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/install.sh"
+
+    - name: Scan dependencies
+      id: scan
+      shell: bash
+      env:
+        RIQ_BIN: ${{ steps.install.outputs.bin }}
+        MEGATRON_TOKEN: ${{ inputs.token }}
+        RIQ_SERVER: ${{ inputs.server }}
+        RIQ_PROJECT: ${{ inputs.project }}
+        RIQ_SBOM_NAME: ${{ inputs.sbom-name }}
+        RIQ_REPORT_FORMAT: ${{ inputs.report-format }}
+        RIQ_SARIF_FILE: ${{ inputs.sarif-file }}
+        RIQ_INCLUDE_INTERNAL: ${{ inputs.include-internal-packages }}
+        RIQ_INTERNAL: ${{ inputs.internal-packages }}
+        RIQ_FAIL_ON: ${{ inputs.fail-on }}
+        RIQ_PATH: ${{ inputs.path }}
+        RIQ_EXCLUDE: ${{ inputs.exclude }}
+        RIQ_SBOM_FILE: ${{ inputs.sbom-file }}
+        RIQ_IGNORE_FILE: ${{ inputs.ignore-file }}
+        RIQ_WAIT: ${{ inputs.wait }}
+        RIQ_UPLOAD_SARIF: ${{ inputs.upload-sarif }}
+        RIQ_FORK_PR: ${{ github.event.pull_request.head.repo.full_name != '' && github.event.pull_request.head.repo.full_name != github.repository }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/scan.sh"
+
+    # The report is sent even when the scan failed the build, so the alerts show up. A failed
+    # upload (no permission, no Code Security on a private repository) is a warning, not a failure.
+    - name: Upload SARIF to code scanning
+      if: ${{ steps.scan.outputs.send-sarif == 'true' }}
+      continue-on-error: true
+      uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+      with:
+        sarif_file: ${{ steps.scan.outputs.sarif-file }}
+        checkout_path: ${{ github.workspace }}
+
+    - name: Result
+      shell: bash
+      env:
+        RIQ_EXIT: ${{ steps.scan.outputs.exit-code }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/result.sh"

@@ -1,0 +1,9 @@
+{
+  "name": "megatron-action-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@acme/internal-ui": "^1.0.0",
+    "lodash": "4.17.11"
+  }
+}

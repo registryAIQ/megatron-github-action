@@ -1,24 +1,18 @@
-# Security Policy
+# Security policy
 
 ## Reporting a vulnerability
 
-Please do not report security vulnerabilities in public GitHub issues. Contact registryAIQ through its designated security-reporting channel.
+Please don't open a public issue. Use GitHub's **Report a vulnerability** button on this repository's Security tab (private vulnerability reporting). We'll acknowledge within 3 working days and keep you updated until it's fixed.
 
-**Before publication:** registryAIQ must replace the instruction above with a monitored security contact address or a verified private vulnerability reporting process.
+## How this action protects you
+
+- **Only the SBOM is uploaded.** Source code stays on the runner. With `include-internal-packages: no`, internal package names stay there too.
+- **Checked binaries.** `riq-scan` is downloaded from this repository's releases and run only if its SHA-256 matches the checksum committed in this repository. Pin the action to a commit SHA, and you pin the binary as well.
+- **No script injection.** Inputs are passed to the scripts as environment variables, never written into the script text.
+- **The token stays private.** It's read from the `MEGATRON_TOKEN` environment variable, never put on a command line, and sent only over HTTPS. Plain HTTP is refused except to localhost.
+- **Pinned dependencies.** The one third-party action used, `github/codeql-action/upload-sarif`, is pinned to a commit SHA.
+- **Least privilege.** The token acts with its user's role in Megatron. Create it for a user who has only the access the pipeline needs, and give it the shortest expiry you can manage.
 
 ## Supported versions
 
-Security support applies to the latest supported major release unless registryAIQ publishes a different policy.
-
-## Secrets and untrusted pull requests
-
-- Store the Megatron API key in GitHub Actions Secrets.
-- The action passes the key to the scanner through an environment variable, not command-line arguments.
-- Never print the key or include it in SARIF, artifacts, logs, or workflow outputs.
-- Do not execute untrusted fork pull-request code in a privileged `pull_request_target` workflow.
-- Restrict workflow token permissions to the minimum required.
-- Pin third-party actions to reviewed commit SHAs for production use.
-
-## Scanner supply chain
-
-Before production release, pin the container base image and scanner artifact by immutable digest/version, verify checksums or signatures, and document the update process.
+Only the latest major version (`v1`) receives security fixes.

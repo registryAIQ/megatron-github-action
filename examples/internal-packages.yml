@@ -1,0 +1,25 @@
+# Leave the company's own packages out of the SBOM: their names never leave the runner.
+name: Megatron
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: registryaiq/megatron-github-action@v1
+        with:
+          token: ${{ secrets.MEGATRON_TOKEN }}
+          include-internal-packages: no
+          internal-packages: |
+            @acme/*
+            com.acme.*
+            github.com/acme/*

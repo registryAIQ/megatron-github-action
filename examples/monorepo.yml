@@ -1,0 +1,28 @@
+# One Megatron project for the whole repository, one SBOM per service.
+name: Megatron
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [web, api, worker]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: registryaiq/megatron-github-action@v1
+        with:
+          token: ${{ secrets.MEGATRON_TOKEN }}
+          project: Customer Portal
+          sbom-name: ${{ github.repository }}/${{ matrix.service }}
+          path: services/${{ matrix.service }}
+          sarif-file: megatron-${{ matrix.service }}.sarif

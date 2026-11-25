@@ -1,13 +1,11 @@
 # Changelog
 
-All notable changes to this project will be documented here.
+## v1.0.0
 
-## Unreleased
-
-- Initial registryAIQ Megatron GitHub Action starter.
-- Docker-based action wrapper and configurable inputs.
-- Workspace path validation and API-key environment handling.
-- SARIF 2.1.0 structural validation and severity threshold gate.
-- Fork-safe workflow example and unit tests.
-
-> The Megatron CLI installation and CLI/API contract remain to be confirmed by registryAIQ.
+First release.
+- Builds a CycloneDX SBOM on the runner and scans it in Megatron. The project and the SBOM are created or updated by name.
+- Returns the results as SARIF 2.1.0 for GitHub code scanning. Findings ignored in Megatron are sent as suppressed results.
+- `include-internal-packages` and `internal-packages` keep your own package names on the runner.
+- Notes on the lockfile and a summary table for failing findings.
+- Without a token (fork pull requests), the SBOM is checked on the runner against OSV.
+- Runs riq-scan 1.0.0.

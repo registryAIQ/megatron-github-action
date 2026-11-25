@@ -1,0 +1,33 @@
+# Keep the SBOM and SARIF report as build artifacts, and use the outputs in a later step.
+name: Megatron
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: megatron
+        uses: registryaiq/megatron-github-action@v1
+        with:
+          token: ${{ secrets.MEGATRON_TOKEN }}
+          sbom-file: sbom.cdx.json
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: megatron
+          path: |
+            sbom.cdx.json
+            megatron.sarif
+      - if: always()
+        env:
+          SCAN_URL: ${{ steps.megatron.outputs.scan-url }}
+          FAILING: ${{ steps.megatron.outputs.failing }}
+        run: echo "Megatron scan $SCAN_URL ($FAILING failing)"
