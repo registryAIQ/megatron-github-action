@@ -1,0 +1,9 @@
+{
+  "name": "megatron-demo-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Demo project for the Megatron GitHub Action: pins an old axios with known vulnerabilities.",
+  "dependencies": {
+    "axios": "0.21.1"
+  }
+}
