@@ -181,4 +181,4 @@ To report a vulnerability in this action, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-To be decided before the first release; see [LICENSE](LICENSE).
+To be decided before the first release; see [LICENSE](LICENSE)..
